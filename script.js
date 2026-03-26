@@ -262,7 +262,7 @@ function renderBanner(cob, noSat, total) {
       <div class="banner-icon">⚠️</div>
       <div>
         <div class="banner-title">Crisis crítica de desabastecimiento — Cobertura global ${cob.toFixed(1)}%</div>
-        <div class="banner-body">${sinCob} de ${total} recetas con cobertura 0%. Demanda total no atendida: ${noSat.toLocaleString()} unidades. Se requiere acción inmediata en reposición de medicamentos.</div>
+        <div class="banner-body"> Demanda total no atendida: ${noSat.toLocaleString()} unidades. Se requiere acción inmediata en reposición de medicamentos.</div>
       </div></div>`;
   } else if (cob < 50) {
     el.style.display = 'block';
@@ -387,10 +387,10 @@ function renderKPIs(data) {
   const p = (a,b) => b ? (a/b*100).toFixed(1)+'%' : '0%';
 
   const kpis = [
-    {lbl:'No satisfecha', val:totalNoSat.toLocaleString(), sub:'unidades sin atender',      icon:'🚫', c:'c-red'},
+    {lbl:'Productos No satisfechos', val:totalNoSat.toLocaleString(), sub:'unidades sin atender',      icon:'🚫', c:'c-red'},
     {lbl:'Cobertura global', val:cob.toFixed(1)+'%',      sub:`${totalDisp.toLocaleString()} de ${totalReq.toLocaleString()} u`, icon:'📊', c:cobColor},
-    {lbl:'Registros',     val:data.length,                sub:'recetas no atendidas',        icon:'📋', c:'c-cyan'},
-    {lbl:'Sin cobertura', val:sinCob,                     sub:p(sinCob,data.length)+' del total', icon:'🔴', c:'c-red'},
+    //{lbl:'Registros',     val:data.length,                sub:'recetas no atendidas',        icon:'📋', c:'c-cyan'},
+    //{lbl:'Sin cobertura', val:sinCob,                     sub:p(sinCob,data.length)+' del total', icon:'🔴', c:'c-red'},
     {lbl:'EESS afectados',val:estabs,                     sub:'establecimientos',             icon:'🏥', c:'c-orange'},
     {lbl:'Productos únicos',val:prods,                    sub:'ítems distintos',              icon:'💊', c:'c-blue'},
     {lbl:'Requerida total',val:totalReq.toLocaleString(), sub:'unidades requeridas',          icon:'📦', c:'c-violet'},
