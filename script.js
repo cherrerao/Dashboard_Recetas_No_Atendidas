@@ -40,6 +40,21 @@ async function fetchSheetData() {
   throw new Error('No se pudo conectar con Google Sheets. Verifica que el Sheet sea público.');
 }
 
+
+let RED_MAP = {};
+
+async function cargarCatalogo() {
+  const res = await fetch("catalogo_establecimientos.json");
+  const json = await res.json();
+
+  json.redes.forEach(red => {
+    red.establecimientos.forEach(est => {
+      RED_MAP[est.cod_pre] = red.nombre;
+    });
+  });
+}
+
+
 function parseCSV(csv) {
   const lines = csv.split('\n').filter(l => l.trim());
   if (lines.length < 2) throw new Error('La hoja está vacía o sin datos.');
@@ -53,9 +68,13 @@ function parseCSV(csv) {
     }
     result.push(current.trim()); return result;
   }
+  
+
   const h = parseLine(lines[0]).map(h => h.replace(/^"|"$/g,'').trim());
   const idx = {};
   const COL_MAP = {
+    REDES:     ['Redes','redes'],
+    cod_pre:   ['COD PRE','cod_pre','cod pre'],
     estab:     ['Establecimiento','establecimiento'],
     producto:  ['Producto','producto'],
     servicio:  ['Tipo de Servicio','Servicio'],
@@ -68,7 +87,7 @@ function parseCSV(csv) {
     usuario:   ['Usuario que Registró','Usuario'],
   };
   for (const [key, candidates] of Object.entries(COL_MAP)) {
-    for (const c of candidates) { const i = h.findIndex(x => x === c); if (i !== -1) { idx[key] = i; break; } }
+    for (const c of candidates) { const i =  h.findIndex(x => x === c); if (i !== -1) { idx[key] = i; break; } }
   }
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
@@ -82,10 +101,14 @@ function parseCSV(csv) {
       const d = new Date(fechaStr.replace(/(\d{2})\/(\d{2})\/(\d{4})/,'$3-$2-$1'));
       if (!isNaN(d)) { fecha = d; mesKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); mesNombre = d.toLocaleDateString('es-PE',{month:'long',year:'numeric'}); }
     }
+
     const req = getNum('requerida'), disp = getNum('disponible');
     const noS = getNum('noSat') || Math.max(0, req - disp);
     const cob = getNum('cobertura');
-    rows.push({ estab:get('estab'), producto:get('producto'), servicio:get('servicio'), requerida:req, disponible:disp, noSat:noS, cobertura:cob, fecha, mesKey, mesNombre, obs:get('obs'), usuario:get('usuario') });
+    const codPre = get('cod_pre').padStart(5,'0');
+    const red = RED_MAP[codPre] || 'Sin red asignada';
+    
+    rows.push({ redes: red, cod_pre:get('cod_pre'), estab:get('estab'), producto:get('producto'), servicio:get('servicio'), requerida:req, disponible:disp, noSat:noS, cobertura:cob, fecha, mesKey, mesNombre, obs:get('obs'), usuario:get('usuario') });
   }
   return rows.filter(r => r.estab && r.producto);
 }
@@ -98,6 +121,7 @@ async function reloadData() {
   btn.classList.add('spinning');
   document.getElementById('dash-content').innerHTML = `<div class="loading-overlay"><div class="loader"></div><div class="loading-text">Leyendo datos desde Google Sheets…</div></div>`;
   try {
+    await cargarCatalogo();
     allData = await fetchSheetData();
     if (!allData.length) throw new Error('No se encontraron filas con datos.');
     buildPeriodTabs();
@@ -291,6 +315,7 @@ function buildDashHTML() {
         <div class="tbl-bar">
           <span class="tbl-bar-title">Registros</span>
           <input class="inp" type="text" id="t-search" placeholder="🔍 Buscar producto o establecimiento…" style="width:240px" oninput="filterTable()">
+          <select class="inp" id="t-redes" onchange="filterTable()"><option value="">Todas las redes</option></select>
           <select class="inp" id="t-estab" onchange="filterTable()"><option value="">Todos los EESS</option></select>
           <select class="inp" id="t-servicio" onchange="filterTable()"><option value="">Todos los servicios</option></select>
           <select class="inp" id="t-cob" onchange="filterTable()">
@@ -304,6 +329,8 @@ function buildDashHTML() {
         <div class="tbl-wrap">
           <table>
             <thead><tr>
+              <th onclick="sortTbl('redes')">Redes</th>
+              <th onclick="sortTbl('cod_pre')">COD PRE</th>
               <th onclick="sortTbl('estab')">Establecimiento</th>
               <th onclick="sortTbl('producto')">Producto</th>
               <th onclick="sortTbl('servicio')">Servicio</th>
@@ -603,6 +630,11 @@ function populateFilters() {
   if (!se||!ss) return;
   const pe=se.value, ps=ss.value;
   se.innerHTML = '<option value="">Todos los EESS</option>' + estabs.map(e=>`<option value="${e}">${e}</option>`).join('');
+  const redes = [...new Set(allData.map(r=>r.redes))].sort();
+  const sr = document.getElementById('t-redes');
+  if (sr) {
+    sr.innerHTML = '<option value="">Todas las redes</option>' + redes.map(r=>`<option value="${r}">${r}</option>`).join('');
+  }
   ss.innerHTML = '<option value="">Todos los servicios</option>' + servicios.map(s=>`<option value="${s}">${s}</option>`).join('');
   se.value=pe; ss.value=ps;
 }
@@ -612,10 +644,12 @@ function filterTable() {
   const fe = document.getElementById('t-estab')?.value||'';
   const fs = document.getElementById('t-servicio')?.value||'';
   const fc = document.getElementById('t-cob')?.value||'';
+  const fr = document.getElementById('t-redes')?.value||'';
 
   let rows = filteredData.filter(r => {
     if (fe && r.estab!==fe) return false;
     if (fs && r.servicio!==fs) return false;
+    if (fr && r.redes!==fr) return false;
     if (fc==='0' && r.cobertura!==0) return false;
     if (fc==='parcial' && !(r.cobertura>0&&r.cobertura<100)) return false;
     if (s && !r.producto.toLowerCase().includes(s) && !r.estab.toLowerCase().includes(s)) return false;
@@ -651,7 +685,9 @@ function filterTable() {
 
   tbody.innerHTML = slice.length
     ? slice.map(r=>`<tr>
-        <td style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.estab}">${r.estab}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted2)">${r.redes || '-'}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted2)">${r.cod_pre}</td>
+        <td style="font-size:11px;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.estab}</td>
         <td style="font-size:11px;max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${r.producto}">${r.producto}</td>
         <td style="font-size:10px;color:var(--muted2)">${r.servicio}</td>
         <td class="mono" style="text-align:right">${r.requerida.toLocaleString()}</td>
@@ -660,7 +696,7 @@ function filterTable() {
         <td>${cobPill(r.cobertura)}</td>
         <td class="mono" style="font-size:10px">${r.fecha?r.fecha.toLocaleDateString('es-PE'):'-'}</td>
       </tr>`).join('')
-    : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--muted)">Sin resultados</td></tr>';
+    : '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--muted)">Sin resultados</td></tr>';
 }
 
 function sortTbl(col) {
@@ -674,8 +710,8 @@ function nextPage(){const tp=Math.ceil(filteredData.length/PAGE);if(page<tp){pag
 // EXPORT CSV
 // ═══════════════════════════════════════════════════════════════
 function exportCSV() {
-  const cols  = ['estab','producto','servicio','requerida','disponible','noSat','cobertura','fecha'];
-  const heads = ['Establecimiento','Producto','Servicio','Requerida','Disponible','Sin Atender','Cobertura %','Fecha'];
+  const cols  = ['redes','cod_pre','estab','producto','servicio','requerida','disponible','noSat','cobertura','fecha'];
+  const heads = [ 'Red','COD PRE','Establecimiento','Producto','Servicio','Requerida','Disponible','Sin Atender','Cobertura %','Fecha' ];
   const rows  = [heads.join(','), ...filteredData.map(r =>
     cols.map(c=>`"${String(r[c] instanceof Date ? r[c].toLocaleDateString('es-PE') : (r[c]||'')).replace(/"/g,'""')}"`).join(',')
   )];
