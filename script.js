@@ -372,7 +372,7 @@ function renderKPIs(data) {
     {lbl:'EESS afectados',       val:estabs,                               sub:'establecimientos con brecha', icon:'🏥', c:'c-orange'},
     {lbl:'Productos únicos',     val:prods,                                sub:'medicamentos distintos',      icon:'💊', c:'c-blue'},
    // {lbl:'Sin cobertura (0%)',   val:sinCob,                               sub:'registros sin ningún stock',  icon:'🔴', c:'c-red'},
-    {lbl:'Stock disponible',     val:totalDisp.toLocaleString('es-PE'),    sub:'unidades entregadas',         icon:'✅', c:'c-green'},
+    {lbl:'Stock atendido',     val:totalDisp.toLocaleString('es-PE'),    sub:'unidades entregadas',         icon:'✅', c:'c-green'},
   ];
 
   document.getElementById('kpi-grid').innerHTML = kpis.map(k=>`
